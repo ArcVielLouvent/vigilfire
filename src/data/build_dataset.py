@@ -20,7 +20,7 @@ from datetime import datetime, timedelta
 import pandas as pd
 
 from src.data.fetch_firms import fetch_fire_hotspots_historical
-from src.data.fetch_power import compute_dryness_streak, fetch_weather_point
+from src.data.fetch_power import compute_dryness_streak, fetch_weather_point, has_sufficient_data
 
 LOOKBACK_DAYS = 7  # how many days of preceding weather to summarize per sample
 
@@ -31,6 +31,8 @@ def _weather_features_for(lat: float, lon: float, anchor_date: datetime) -> dict
     end = (anchor_date - timedelta(days=1)).strftime("%Y%m%d")
 
     weather = fetch_weather_point(lat, lon, start, end)
+    if not has_sufficient_data(weather):
+        raise ValueError(f"insufficient POWER data for ({lat}, {lon}) window {start}-{end}")
     weather["dryness_streak"] = compute_dryness_streak(weather)
 
     return {

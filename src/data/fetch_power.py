@@ -16,6 +16,13 @@ import requests
 
 BASE_URL = "https://power.larc.nasa.gov/api/temporal/daily/point"
 
+# NASA POWER uses -999 as its documented "data not yet available / missing"
+# fill value. Requesting dates too close to "today" (within its processing
+# lag, typically several days to ~1-2 weeks depending on parameter) returns
+# rows full of -999 instead of real data or an error — so this must be
+# checked explicitly, not left to silently corrupt downstream features.
+POWER_FILL_VALUE = -999.0
+
 # Parameters chosen specifically because they are established drivers of
 # fire risk: max temperature, min relative humidity, precipitation
 # (dryness), and wind speed (spread rate).
@@ -64,7 +71,36 @@ def fetch_weather_point(
     df = pd.DataFrame(param_data)
     df.index = pd.to_datetime(df.index, format="%Y%m%d")
     df.index.name = "date"
+
+    # Replace POWER's missing-data sentinel with NaN so it can't silently
+    # pollute downstream feature calculations (e.g. averaging -999 into a
+    # "t2m_max_avg" feature would make an unprocessed day look like an
+    # impossibly extreme heat reading instead of simply missing).
+    missing_mask = df <= POWER_FILL_VALUE + 1  # +1 tolerance for float repr
+    if missing_mask.any().any():
+        n_missing_rows = missing_mask.any(axis=1).sum()
+        print(
+            f"warning: {n_missing_rows}/{len(df)} day(s) in {start_date}-{end_date} "
+            f"returned POWER's missing-data fill value ({POWER_FILL_VALUE}). "
+            "This usually means the requested date range is too recent — "
+            "POWER has a processing lag of several days to ~1-2 weeks. "
+            "Try requesting an end_date further in the past."
+        )
+    df = df.mask(missing_mask)
+
     return df
+
+
+def has_sufficient_data(df: pd.DataFrame, max_missing_frac: float = 0.3) -> bool:
+    """
+    Returns False if too much of the requested window came back missing
+    (see POWER_FILL_VALUE handling above). Callers should check this before
+    trusting derived features like dryness_streak — a day with genuinely
+    missing precipitation data should not silently count as "not dry".
+    """
+    if df.empty:
+        return False
+    return bool(df.isna().mean().max() <= max_missing_frac)
 
 
 def compute_dryness_streak(df: pd.DataFrame, precip_col: str = "PRECTOTCORR", threshold_mm: float = 1.0) -> pd.Series:
