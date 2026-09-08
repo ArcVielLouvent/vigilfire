@@ -78,6 +78,14 @@ def main():
         with st.expander("See underlying weather features"):
             st.dataframe(features)
 
+        with st.expander("Why did the model say this? (feature importance)"):
+            importances = pd.Series(clf.feature_importances_, index=FEATURE_COLUMNS)
+            st.bar_chart(importances.sort_values(ascending=False))
+            st.caption(
+                "Higher bars = the model relied on that feature more heavily "
+                "across its training data, not just for this one scan."
+            )
+
 
 if __name__ == "__main__":
     main()

@@ -59,16 +59,56 @@ def build_positive_samples(bbox: tuple, date: str, sensor: str = "VIIRS_SNPP_SP"
     return pd.DataFrame(rows)
 
 
-def build_negative_samples(bbox: tuple, date: str, n_samples: int, seed: int = 42) -> pd.DataFrame:
-    """Randomly sampled points/date assumed fire-free (no FIRMS hit nearby)."""
+def _is_far_enough(lat: float, lon: float, known_fires: list[tuple[float, float]], min_distance_deg: float) -> bool:
+    """
+    Simple Euclidean-distance exclusion check (good enough at the scale of
+    these regional bboxes; a true Haversine distance would only matter near
+    the poles or across very large areas, neither of which applies here).
+    """
+    for fire_lat, fire_lon in known_fires:
+        if ((lat - fire_lat) ** 2 + (lon - fire_lon) ** 2) ** 0.5 < min_distance_deg:
+            return False
+    return True
+
+
+def build_negative_samples(
+    bbox: tuple,
+    date: str,
+    n_samples: int,
+    known_fires: list[tuple[float, float]] | None = None,
+    min_distance_deg: float = 0.3,  # ~30km at these latitudes — keeps negatives clear of the actual fire
+    seed: int = 42,
+    max_attempts_per_sample: int = 50,
+) -> pd.DataFrame:
+    """
+    Randomly sampled points/date assumed fire-free.
+
+    IMPORTANT: without `known_fires`, a randomly sampled point could land
+    right next to (or on) an actual fire detection, mislabeling it as
+    "no fire" and quietly corrupting the training data (a real form of
+    label leakage, not just noise — it directly biases the model toward
+    thinking fire-prone conditions are safe). Always pass `known_fires`
+    (the positive-sample coordinates from the same call) so those zones
+    are excluded.
+    """
     random.seed(seed)
     min_lon, min_lat, max_lon, max_lat = bbox
     anchor_date = datetime.strptime(date, "%Y-%m-%d")
+    known_fires = known_fires or []
 
     rows = []
     for _ in range(n_samples):
-        lat = random.uniform(min_lat, max_lat)
-        lon = random.uniform(min_lon, max_lon)
+        lat = lon = None
+        for _attempt in range(max_attempts_per_sample):
+            candidate_lat = random.uniform(min_lat, max_lat)
+            candidate_lon = random.uniform(min_lon, max_lon)
+            if _is_far_enough(candidate_lat, candidate_lon, known_fires, min_distance_deg):
+                lat, lon = candidate_lat, candidate_lon
+                break
+        if lat is None:
+            print(f"warning: could not find a fire-free point after {max_attempts_per_sample} attempts, skipping one sample")
+            continue
+
         try:
             feats = _weather_features_for(lat, lon, anchor_date)
             feats.update({"latitude": lat, "longitude": lon, "label": 0})
@@ -88,7 +128,8 @@ def build_dataset(bbox: tuple, dates: list[str], negatives_per_date: int = 20) -
     frames = []
     for date in dates:
         pos = build_positive_samples(bbox, date)
-        neg = build_negative_samples(bbox, date, n_samples=negatives_per_date)
+        known_fires = list(zip(pos["latitude"], pos["longitude"])) if not pos.empty else []
+        neg = build_negative_samples(bbox, date, n_samples=negatives_per_date, known_fires=known_fires)
         frames.extend([pos, neg])
 
     dataset = pd.concat(frames, ignore_index=True).dropna()

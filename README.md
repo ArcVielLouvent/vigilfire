@@ -55,6 +55,24 @@ Python is the backbone of the entire pipeline, not a wrapper layer:
 - A custom backtesting module to convert the model's predictions into a
   measurable early-warning lead time
 
+## Methodological rigor
+
+Two choices worth calling out explicitly, since they're easy to get wrong
+in a rushed hackathon build:
+
+- **No label leakage in negative sampling.** Naively sampling random
+  "no-fire" points/dates in a fire-prone region risks accidentally
+  labeling an actual (but unrecorded-in-this-pull) fire-adjacent point as
+  safe — which quietly teaches the model that fire-prone conditions are
+  fine. Every negative sample is checked against all known fire locations
+  in that batch and rejected if within `min_distance_deg` (default ~30km).
+- **Cross-validated evaluation, not a single lucky split.** On a
+  hackathon-scale dataset, one train/test split can look better or worse
+  than the model really is just by chance. `train_model.py` reports 5-fold
+  stratified cross-validated ROC-AUC (mean ± std) in addition to the
+  held-out test report, so the headline number isn't a single-split
+  artifact.
+
 ## Environmental impact
 
 - **Measurable evidence**: average days of advance warning the model
