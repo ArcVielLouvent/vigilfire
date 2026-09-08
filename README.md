@@ -51,7 +51,8 @@ Python is the backbone of the entire pipeline, not a wrapper layer:
   `pandas`/`numpy`
 - `scikit-learn` `RandomForestClassifier` for the risk model, with
   `class_weight="balanced"` to handle the natural rarity of fire events
-- `streamlit` for the interactive "scan area" demo interface
+- `streamlit` + `pydeck` for the interactive "scan area" demo and the
+  precomputed case-study risk-grid map view
 - A custom backtesting module to convert the model's predictions into a
   measurable early-warning lead time
 
@@ -154,7 +155,12 @@ python -m src.model.train_model
 # 3. Run the backtest to get the headline "days of advance warning" number
 python -m src.model.backtest
 
-# 4. Launch the demo
+# 4. (optional but recommended for the pitch video) Precompute risk grids
+#    for each case study — takes a few minutes, ~25 POWER calls per region
+python -m src.model.precompute_heatmap
+
+# 5. Launch the demo — includes both the live "scan a point" mode and the
+#    "case study risk maps" mode (reads the precomputed grids from step 4)
 streamlit run app.py
 ```
 
@@ -189,7 +195,8 @@ to run it.
 - NASA FIRMS API (satellite fire detections, global, free)
 - NASA POWER API (satellite/reanalysis weather data, global, free)
 - pandas, numpy, scikit-learn, joblib
-- Streamlit
+- Streamlit, pydeck
+- pytest (unit + smoke tests), GitHub Actions (CI/CD)
 
 ## Data & licensing note
 
