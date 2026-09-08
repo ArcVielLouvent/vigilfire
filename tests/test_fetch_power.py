@@ -3,10 +3,11 @@ Unit tests for src.data.fetch_power — pure logic, no network required.
 These run on every commit / every CI build.
 """
 
+import numpy as np
 import pandas as pd
 import pytest
 
-from src.data.fetch_power import compute_dryness_streak
+from src.data.fetch_power import compute_dryness_streak, has_sufficient_data
 
 
 def test_dryness_streak_basic_pattern():
@@ -53,3 +54,34 @@ def test_dryness_streak_edge_values_near_threshold(precip_value):
     """Values right at/below the 1.0mm default threshold should count as dry."""
     df = pd.DataFrame({"PRECTOTCORR": [precip_value]})
     assert compute_dryness_streak(df).tolist() == [1]
+
+
+def test_has_sufficient_data_rejects_all_nan():
+    """Guards against the real bug: NASA POWER's -999 fill value, once
+    converted to NaN, must not be silently treated as usable data."""
+    df = pd.DataFrame({
+        "T2M_MAX": [np.nan] * 5,
+        "RH2M": [np.nan] * 5,
+        "PRECTOTCORR": [np.nan] * 5,
+        "WS10M": [np.nan] * 5,
+    })
+    assert has_sufficient_data(df) is False
+
+
+def test_has_sufficient_data_accepts_clean_data():
+    df = pd.DataFrame({
+        "T2M_MAX": [30.0] * 5,
+        "RH2M": [40.0] * 5,
+        "PRECTOTCORR": [0.0] * 5,
+        "WS10M": [5.0] * 5,
+    })
+    assert has_sufficient_data(df) is True
+
+
+def test_has_sufficient_data_accepts_minor_gaps():
+    df = pd.DataFrame({"T2M_MAX": [30.0, 31.0, np.nan, 29.0, 30.0]})
+    assert has_sufficient_data(df) is True
+
+
+def test_has_sufficient_data_rejects_empty_dataframe():
+    assert has_sufficient_data(pd.DataFrame()) is False

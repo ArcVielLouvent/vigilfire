@@ -15,8 +15,14 @@ import joblib
 import pandas as pd
 import streamlit as st
 
-from src.data.fetch_power import compute_dryness_streak, fetch_weather_point
+from src.data.fetch_power import compute_dryness_streak, fetch_weather_point, has_sufficient_data
 from src.model.train_model import FEATURE_COLUMNS
+
+# NASA POWER has a processing lag (typically several days, sometimes up to
+# ~1-2 weeks) before the most recent days become available. Scanning from
+# "yesterday" often returns unprocessed fill values — a 10-day lag is a
+# safer default for a live demo. See fetch_power.has_sufficient_data().
+DEMO_LAG_DAYS = 10
 
 PRESET_REGIONS = {
     "Los Angeles, USA (Jan 2025 case study)": (34.05, -118.55),
@@ -31,10 +37,14 @@ def load_model():
     return joblib.load("fire_risk_model.joblib")
 
 
-def get_features_for_point(lat: float, lon: float) -> pd.DataFrame:
-    end = datetime.today() - timedelta(days=1)
+def get_features_for_point(lat: float, lon: float) -> pd.DataFrame | None:
+    end = datetime.today() - timedelta(days=DEMO_LAG_DAYS)
     start = end - timedelta(days=7)
     weather = fetch_weather_point(lat, lon, start.strftime("%Y%m%d"), end.strftime("%Y%m%d"))
+
+    if not has_sufficient_data(weather):
+        return None
+
     weather["dryness_streak"] = compute_dryness_streak(weather)
 
     return pd.DataFrame([{
@@ -64,7 +74,17 @@ def main():
         with st.spinner("Pulling last 7 days of weather and scoring risk..."):
             clf = load_model()
             features = get_features_for_point(lat, lon)
-            proba = clf.predict_proba(features)[0, 1]
+
+        if features is None:
+            st.error(
+                "NASA POWER hasn't finished processing weather data for this "
+                "window yet (their pipeline runs several days to ~1-2 weeks "
+                "behind real time). Try again in a few days, or this is "
+                "expected if you're testing right after deploying."
+            )
+            return
+
+        proba = clf.predict_proba(features)[0, 1]
 
         st.metric("Wildfire risk score", f"{proba:.0%}")
 
