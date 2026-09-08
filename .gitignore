@@ -1,0 +1,18 @@
+__pycache__/
+*.pyc
+.venv/
+venv/
+.env
+
+# raw/cached data files (too large / regenerable, don't commit)
+data/raw/*.csv
+data/processed/*.csv
+!data/raw/.gitkeep
+!data/processed/.gitkeep
+
+# trained model artifacts (regenerable via train_model.py)
+*.joblib
+*.pkl
+
+.streamlit/
+.ipynb_checkpoints/
