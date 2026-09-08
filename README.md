@@ -140,6 +140,31 @@ python -m src.model.backtest
 streamlit run app.py
 ```
 
+## Testing
+
+```bash
+# Fast, offline unit tests (run these on every commit)
+pytest
+
+# Full smoke test against the real NASA APIs (needs internet + FIRMS_MAP_KEY)
+pytest -m smoke
+```
+
+CI runs the offline unit tests automatically on every push via GitHub
+Actions (`.github/workflows/ci.yml`). The smoke-test job is manual-trigger
+only (Actions tab -> Run workflow) to avoid hitting NASA's rate limits on
+every commit — add a `FIRMS_MAP_KEY` repository secret first if you want
+to run it.
+
+## Branching convention
+
+- `main` — always working/demoable
+- `develop` — integration branch for in-progress work
+- `phase-N-<name>` — one branch per development phase (e.g.
+  `phase-2-model-training`), merged into `develop` when that phase's work
+  is validated, matching the depth-first, one-phase-at-a-time workflow
+  this project follows.
+
 ## Technologies used
 
 - Python 3.11+
