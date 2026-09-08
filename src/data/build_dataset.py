@@ -1,0 +1,108 @@
+"""
+build_dataset.py
+
+Builds a labeled training dataset by combining:
+  - Positive examples: locations/dates where FIRMS recorded an actual fire
+    detection (label = 1).
+  - Negative examples: randomly sampled locations/dates within the same
+    region where no fire was detected within a buffer window (label = 0).
+
+Each row gets joined with the preceding weather conditions from NASA POWER
+(e.g. the week leading up to the date), since fire risk is driven by
+*antecedent* dryness/heat, not same-day weather.
+
+Run this locally (needs internet access to both FIRMS and POWER APIs).
+"""
+
+import random
+from datetime import datetime, timedelta
+
+import pandas as pd
+
+from src.data.fetch_firms import fetch_fire_hotspots_historical
+from src.data.fetch_power import compute_dryness_streak, fetch_weather_point
+
+LOOKBACK_DAYS = 7  # how many days of preceding weather to summarize per sample
+
+
+def _weather_features_for(lat: float, lon: float, anchor_date: datetime) -> dict:
+    """Summarize the LOOKBACK_DAYS of weather preceding anchor_date into features."""
+    start = (anchor_date - timedelta(days=LOOKBACK_DAYS)).strftime("%Y%m%d")
+    end = (anchor_date - timedelta(days=1)).strftime("%Y%m%d")
+
+    weather = fetch_weather_point(lat, lon, start, end)
+    weather["dryness_streak"] = compute_dryness_streak(weather)
+
+    return {
+        "t2m_max_avg": weather["T2M_MAX"].mean(),
+        "rh2m_min": weather["RH2M"].min(),
+        "precip_total": weather["PRECTOTCORR"].sum(),
+        "wind_max": weather["WS10M"].max(),
+        "dryness_streak_max": weather["dryness_streak"].max(),
+    }
+
+
+def build_positive_samples(bbox: tuple, date: str, sensor: str = "VIIRS_SNPP_SP") -> pd.DataFrame:
+    """One row per actual fire detection, joined with preceding weather."""
+    fires = fetch_fire_hotspots_historical(bbox, date=date, sensor=sensor)
+    anchor_date = datetime.strptime(date, "%Y-%m-%d")
+
+    rows = []
+    for _, fire in fires.iterrows():
+        try:
+            feats = _weather_features_for(fire["latitude"], fire["longitude"], anchor_date)
+            feats.update({"latitude": fire["latitude"], "longitude": fire["longitude"], "label": 1})
+            rows.append(feats)
+        except Exception as e:  # noqa: BLE001 — log and skip bad points, don't kill the whole batch
+            print(f"skip point ({fire['latitude']}, {fire['longitude']}): {e}")
+
+    return pd.DataFrame(rows)
+
+
+def build_negative_samples(bbox: tuple, date: str, n_samples: int, seed: int = 42) -> pd.DataFrame:
+    """Randomly sampled points/date assumed fire-free (no FIRMS hit nearby)."""
+    random.seed(seed)
+    min_lon, min_lat, max_lon, max_lat = bbox
+    anchor_date = datetime.strptime(date, "%Y-%m-%d")
+
+    rows = []
+    for _ in range(n_samples):
+        lat = random.uniform(min_lat, max_lat)
+        lon = random.uniform(min_lon, max_lon)
+        try:
+            feats = _weather_features_for(lat, lon, anchor_date)
+            feats.update({"latitude": lat, "longitude": lon, "label": 0})
+            rows.append(feats)
+        except Exception as e:  # noqa: BLE001
+            print(f"skip point ({lat}, {lon}): {e}")
+
+    return pd.DataFrame(rows)
+
+
+def build_dataset(bbox: tuple, dates: list[str], negatives_per_date: int = 20) -> pd.DataFrame:
+    """
+    Full pipeline across multiple historical dates, so the model sees
+    fires under a range of seasonal/weather conditions rather than just
+    one snapshot.
+    """
+    frames = []
+    for date in dates:
+        pos = build_positive_samples(bbox, date)
+        neg = build_negative_samples(bbox, date, n_samples=negatives_per_date)
+        frames.extend([pos, neg])
+
+    dataset = pd.concat(frames, ignore_index=True).dropna()
+    return dataset
+
+
+if __name__ == "__main__":
+    # Example: Kalimantan, a handful of dates spanning dry-season peaks.
+    # Extend/replace with dates + regions matching the case studies you use
+    # in the pitch (e.g. add South America, California, South Korea bboxes).
+    kalimantan_bbox = (108.5, -4.5, 119.0, 4.5)
+    sample_dates = ["2026-08-01", "2026-08-15", "2026-09-01"]
+
+    df = build_dataset(kalimantan_bbox, sample_dates, negatives_per_date=15)
+    df.to_csv("data/processed/training_data.csv", index=False)
+    print(f"Saved {len(df)} rows -> data/processed/training_data.csv")
+    print(df["label"].value_counts())
