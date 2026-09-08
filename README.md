@@ -1,4 +1,4 @@
-# Pyrelert — Global Wildfire Risk Early-Warning Scanner
+# Vigilfire — Global Wildfire Risk Early-Warning Scanner
 
 Built for the PyStorm hackathon ("Code for a Greener Future").
 
@@ -22,9 +22,9 @@ public fire-tracking tools (including NASA FIRMS itself) only show fires
 that have *already* been detected by satellite — after ignition, not
 before.
 
-## What Pyrelert does
+## What Vigilfire does
 
-Pyrelert scans a user-specified region and estimates near-term wildfire
+Vigilfire scans a user-specified region and estimates near-term wildfire
 risk *before* ignition, using only the antecedent weather trend (heat,
 dryness, humidity, wind) of the preceding week — the same conditions
 fire scientists use to explain why a fire spread the way it did, but
@@ -68,10 +68,40 @@ Python is the backbone of the entire pipeline, not a wrapper layer:
   so the same pipeline works for any region without modification —
   Kalimantan, California, Australia, Southern Europe, or South America.
 
+## Why this is different from existing tools
+
+Several open wildfire-risk projects already exist, and it's worth being
+upfront about them rather than claiming this space is empty:
+
+- **[pyro-risks](https://github.com/pyronear/pyro-risks)** (Pyronear) — a
+  real, working ML forecasting package, but scoped to France's NUTS-3
+  departments and built on the Copernicus CDS API, which requires account
+  registration.
+- **Fire Spotter** — proposes a similar open, self-hostable, weather-driven
+  risk-scoring mission, but as of this writing the risk-modeling code is
+  an unimplemented stub.
+- **WeatherWise/BreatheWise** — combines wildfire and air-quality
+  prediction for Canada, but depends on the paid Weatherbit API.
+
+Vigilfire's specific gap-closing combination:
+1. **Zero-registration weather data** (NASA POWER needs no API key at all)
+   and **instant-registration fire data** (NASA FIRMS key issued
+   immediately, no approval wait) — no paid or gated APIs anywhere in the
+   pipeline.
+2. **Coordinate-agnostic by design** — works at any lat/lon on Earth
+   without retraining or region-specific administrative boundaries.
+3. **Output framed as a lead-time number** ("N days of advance warning
+   before satellite detection"), not an abstract risk probability —
+   several academic wildfire-risk papers report classification/probability
+   metrics, but none frame the result this way.
+4. **Actually implemented and validated** across three independent
+   real 2025 wildfire events on three different continents (see Case
+   studies below), not a proposal or a single-region deployment.
+
 ## Project structure
 
 ```
-pyrelert/
+vigilfire/
 ├── app.py                      # Streamlit "scan area" demo
 ├── src/
 │   ├── data/

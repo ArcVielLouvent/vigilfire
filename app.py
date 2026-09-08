@@ -47,8 +47,8 @@ def get_features_for_point(lat: float, lon: float) -> pd.DataFrame:
 
 
 def main():
-    st.set_page_config(page_title="Pyrelert — Wildfire Risk Scanner", page_icon="🔥")
-    st.title("🔥 Pyrelert")
+    st.set_page_config(page_title="Vigilfire — Wildfire Risk Scanner", page_icon="🔥")
+    st.title("🔥 Vigilfire")
     st.caption("Scan any region for near-term wildfire risk, based on satellite-trained weather patterns.")
 
     choice = st.selectbox("Choose a region to scan", list(PRESET_REGIONS.keys()))
