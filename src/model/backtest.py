@@ -66,19 +66,27 @@ def lead_time_for_fire(clf, lat: float, lon: float, fire_date: str, window_days:
 if __name__ == "__main__":
     clf = joblib.load("fire_risk_model.joblib")
 
-    # Replace with real historical fire events pulled from FIRMS for your
-    # chosen case-study regions (match the case studies used in the pitch).
+    # Three final case studies for the pitch (see README). Lat/lon here are
+    # approximate centroids of each event — after running fetch_firms.py
+    # for each case study's bbox, replace these with the *actual* detected
+    # hotspot coordinates and earliest detection date for an accurate,
+    # rule-10-compliant lead-time claim.
     test_fires = [
-        {"lat": -2.1, "lon": 113.5, "date": "2026-08-20"},
+        {"lat": 34.05, "lon": -118.55, "date": "2025-01-07", "case_study": "los_angeles_2025"},
+        {"lat": 36.5, "lon": 128.8, "date": "2025-03-22", "case_study": "south_korea_2025"},
+        {"lat": -42.5, "lon": -70.0, "date": "2025-01-20", "case_study": "patagonia_2025"},
     ]
 
     lead_times = []
     for fire in test_fires:
         lt = lead_time_for_fire(clf, fire["lat"], fire["lon"], fire["date"])
-        print(f"Fire at ({fire['lat']}, {fire['lon']}) on {fire['date']}: "
+        print(f"[{fire['case_study']}] fire on {fire['date']}: "
               f"{lt if lt is not None else 'no warning'} days advance warning")
         if lt is not None:
             lead_times.append(lt)
 
     if lead_times:
-        print(f"\nAverage lead time: {sum(lead_times) / len(lead_times):.1f} days")
+        print(f"\nAverage lead time across case studies: {sum(lead_times) / len(lead_times):.1f} days")
+    else:
+        print("\nNo case study crossed the risk threshold in the test window — "
+              "consider lowering risk_threshold or checking feature scaling.")

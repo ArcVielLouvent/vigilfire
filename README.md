@@ -1,4 +1,4 @@
-# FireSight — Global Wildfire Risk Early-Warning Scanner
+# Pyrelert — Global Wildfire Risk Early-Warning Scanner
 
 Built for the PyStorm hackathon ("Code for a Greener Future").
 
@@ -22,9 +22,9 @@ public fire-tracking tools (including NASA FIRMS itself) only show fires
 that have *already* been detected by satellite — after ignition, not
 before.
 
-## What FireSight does
+## What Pyrelert does
 
-FireSight scans a user-specified region and estimates near-term wildfire
+Pyrelert scans a user-specified region and estimates near-term wildfire
 risk *before* ignition, using only the antecedent weather trend (heat,
 dryness, humidity, wind) of the preceding week — the same conditions
 fire scientists use to explain why a fire spread the way it did, but
@@ -71,7 +71,7 @@ Python is the backbone of the entire pipeline, not a wrapper layer:
 ## Project structure
 
 ```
-firesight/
+pyrelert/
 ├── app.py                      # Streamlit "scan area" demo
 ├── src/
 │   ├── data/

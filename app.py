@@ -19,10 +19,9 @@ from src.data.fetch_power import compute_dryness_streak, fetch_weather_point
 from src.model.train_model import FEATURE_COLUMNS
 
 PRESET_REGIONS = {
-    "Kalimantan, Indonesia": (-2.5, 113.0),
-    "Northern California, USA": (39.5, -121.5),
-    "New South Wales, Australia": (-33.0, 147.0),
-    "Andalusia, Spain": (37.5, -4.5),
+    "Los Angeles, USA (Jan 2025 case study)": (34.05, -118.55),
+    "Gyeongsangbuk-do, South Korea (Mar 2025 case study)": (36.5, 128.8),
+    "Patagonia, Argentina/Chile (Jan 2025 case study)": (-42.5, -70.0),
     "Custom coordinates": None,
 }
 
@@ -48,8 +47,8 @@ def get_features_for_point(lat: float, lon: float) -> pd.DataFrame:
 
 
 def main():
-    st.set_page_config(page_title="FireSight — Wildfire Risk Scanner", page_icon="🔥")
-    st.title("🔥 FireSight")
+    st.set_page_config(page_title="Pyrelert — Wildfire Risk Scanner", page_icon="🔥")
+    st.title("🔥 Pyrelert")
     st.caption("Scan any region for near-term wildfire risk, based on satellite-trained weather patterns.")
 
     choice = st.selectbox("Choose a region to scan", list(PRESET_REGIONS.keys()))

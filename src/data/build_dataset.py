@@ -95,14 +95,37 @@ def build_dataset(bbox: tuple, dates: list[str], negatives_per_date: int = 20) -
     return dataset
 
 
-if __name__ == "__main__":
-    # Example: Kalimantan, a handful of dates spanning dry-season peaks.
-    # Extend/replace with dates + regions matching the case studies you use
-    # in the pitch (e.g. add South America, California, South Korea bboxes).
-    kalimantan_bbox = (108.5, -4.5, 119.0, 4.5)
-    sample_dates = ["2026-08-01", "2026-08-15", "2026-09-01"]
 
-    df = build_dataset(kalimantan_bbox, sample_dates, negatives_per_date=15)
+# Final case-study regions for the pitch (see README for the sourcing/story
+# behind each). Anchor dates are approximate from news reporting — verify
+# against the actual earliest FIRMS detection in each bbox/window before
+# using them in the final backtest numbers (rule 10: accurate claims only).
+CASE_STUDIES = {
+    "los_angeles_2025": {
+        "bbox": (-119.0, 33.7, -117.5, 34.5),
+        "date": "2025-01-07",  # Palisades Fire ignition
+    },
+    "south_korea_2025": {
+        "bbox": (128.3, 36.0, 129.3, 37.0),
+        "date": "2025-03-22",  # Gyeongsangbuk-do outbreak
+    },
+    "patagonia_2025": {
+        "bbox": (-72.5, -45.0, -68.0, -40.0),
+        "date": "2025-01-20",  # Argentina/Chile wildfire season
+    },
+}
+
+
+if __name__ == "__main__":
+    all_frames = []
+    for name, cfg in CASE_STUDIES.items():
+        print(f"Building samples for {name}...")
+        df_case = build_dataset(cfg["bbox"], [cfg["date"]], negatives_per_date=15)
+        df_case["case_study"] = name
+        all_frames.append(df_case)
+
+    df = pd.concat(all_frames, ignore_index=True)
     df.to_csv("data/processed/training_data.csv", index=False)
     print(f"Saved {len(df)} rows -> data/processed/training_data.csv")
     print(df["label"].value_counts())
+    print(df["case_study"].value_counts())
